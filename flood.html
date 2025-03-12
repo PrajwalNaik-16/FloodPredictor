@@ -88,14 +88,16 @@
         const apiKey = "7776da07921499de48583da7c2bacacf";
         let map = L.map("map").setView([20.5937, 78.9629], 5);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
+
         async function fetchFloodData(lat, lon, type) {
             let url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
             try {
                 let response = await fetch(url);
                 let data = await response.json();
                 let rainfall = data.rain ? data.rain["1h"] || 0 : 0;
-                let floodRisk = rainfall > 20 ? "⚠️ High" : rainfall > 10 ? "⚠️ Medium" : "✅ Low";
+                let floodRisk = rainfall > 20 ? "🔥 High" : rainfall > 10 ? "⚠️ Medium" : "📍 Low";
                 let timestamp = new Date().toLocaleString();
+
                 document.getElementById("floodTable").innerHTML += `
                     <tr>
                         <td>${data.name}</td>
@@ -103,13 +105,36 @@
                         <td>${floodRisk} (${type})</td>
                         <td>${timestamp}</td>
                     </tr>`;
-                L.marker([lat, lon], { title: `${data.name} - ${type}` }).addTo(map)
-                    .bindPopup(`<b>${data.name} (${type})</b><br>Rain: ${rainfall} mm<br>Flood Risk: ${floodRisk}<br>Time: ${timestamp}`)
+
+                // Remove old markers before adding new ones
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
+                    }
+                });
+
+                // Set marker icons based on flood risk
+                let markerIcon;
+                if (rainfall > 20) {
+                    markerIcon = "🔥"; // High flood risk
+                } else if (rainfall > 10) {
+                    markerIcon = "⚠️"; // Medium risk
+                } else {
+                    markerIcon = "📍"; // Low risk
+                }
+
+                L.marker([lat, lon])
+                    .addTo(map)
+                    .bindPopup(`<b>${data.name} (${type})</b><br>
+                                <b>Rain:</b> ${rainfall} mm<br>
+                                <b>Flood Risk:</b> ${floodRisk}<br>
+                                <b>Time:</b> ${timestamp}`)
                     .openPopup();
             } catch (error) {
                 console.error("Error fetching flood data:", error);
             }
         }
+
         function getUserLocation() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(position => {
@@ -129,6 +154,7 @@
                 alert("Geolocation is not supported by this browser.");
             }
         }
+
         async function fetchHistoricalFloods() {
             let pastLocations = [
                 { lat: 28.6139, lon: 77.2090 },
@@ -137,6 +163,7 @@
             ];
             pastLocations.forEach(loc => fetchFloodData(loc.lat, loc.lon, "Past"));
         }
+
         async function fetchPredictedFloods() {
             let futureLocations = [
                 { lat: 12.9716, lon: 77.5946 },
@@ -145,6 +172,7 @@
             ];
             futureLocations.forEach(loc => fetchFloodData(loc.lat, loc.lon, "Predicted"));
         }
+
         getUserLocation();
         setInterval(getUserLocation, 60000);
     </script>
