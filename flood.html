@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Flood Alerts - Past, Current & Predicted</title>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #e74c3c;
+            --light-bg: #ecf0f1;
+            --dark-text: #333;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        body {
+            background: var(--light-bg);
+            text-align: center;
+            padding: 20px;
+        }
+        h2 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+        #map {
+            height: 450px;
+            width: 90%;
+            margin: 20px auto;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        table {
+            width: 90%;
+            margin: auto;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--light-bg);
+        }
+        th {
+            background: var(--accent-color);
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f7f7f7;
+        }
+        .info-box {
+            background: var(--secondary-color);
+            color: white;
+            padding: 15px;
+            margin: 10px auto;
+            width: 80%;
+            border-radius: 8px;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <h2>🌊 Live Flood Alerts</h2>
+    <p class="info-box"><b>Location:</b> <span id="location">Fetching...</span></p>
+    <table>
+        <thead>
+            <tr>
+                <th>City</th>
+                <th>Rainfall (mm)</th>
+                <th>Flood Risk</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody id="floodTable"></tbody>
+    </table>
+    <h3 style="color: var(--primary-color); margin-top: 20px;">🌍 Live Flood Map</h3>
+    <div id="map"></div>
+    <script>
+        const apiKey = "7776da07921499de48583da7c2bacacf";
+        let map = L.map("map").setView([20.5937, 78.9629], 5);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
+        async function fetchFloodData(lat, lon, type) {
+            let url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+            try {
+                let response = await fetch(url);
+                let data = await response.json();
+                let rainfall = data.rain ? data.rain["1h"] || 0 : 0;
+                let floodRisk = rainfall > 20 ? "⚠️ High" : rainfall > 10 ? "⚠️ Medium" : "✅ Low";
+                let timestamp = new Date().toLocaleString();
+                document.getElementById("floodTable").innerHTML += `
+                    <tr>
+                        <td>${data.name}</td>
+                        <td>${rainfall} mm</td>
+                        <td>${floodRisk} (${type})</td>
+                        <td>${timestamp}</td>
+                    </tr>`;
+                L.marker([lat, lon], { title: `${data.name} - ${type}` }).addTo(map)
+                    .bindPopup(`<b>${data.name} (${type})</b><br>Rain: ${rainfall} mm<br>Flood Risk: ${floodRisk}<br>Time: ${timestamp}`)
+                    .openPopup();
+            } catch (error) {
+                console.error("Error fetching flood data:", error);
+            }
+        }
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    let lat = position.coords.latitude;
+                    let lon = position.coords.longitude;
+                    document.getElementById("location").innerText = `Lat: ${lat}, Lon: ${lon}`;
+                    fetchFloodData(lat, lon, "Current");
+                    fetchHistoricalFloods();
+                    fetchPredictedFloods();
+                }, error => {
+                    console.log("Location access denied, using default location.");
+                    fetchFloodData(20.5937, 78.9629, "Current");
+                    fetchHistoricalFloods();
+                    fetchPredictedFloods();
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+        async function fetchHistoricalFloods() {
+            let pastLocations = [
+                { lat: 28.6139, lon: 77.2090 },
+                { lat: 19.0760, lon: 72.8777 },
+                { lat: 22.5726, lon: 88.3639 }
+            ];
+            pastLocations.forEach(loc => fetchFloodData(loc.lat, loc.lon, "Past"));
+        }
+        async function fetchPredictedFloods() {
+            let futureLocations = [
+                { lat: 12.9716, lon: 77.5946 },
+                { lat: 13.0827, lon: 80.2707 },
+                { lat: 26.8467, lon: 80.9462 }
+            ];
+            futureLocations.forEach(loc => fetchFloodData(loc.lat, loc.lon, "Predicted"));
+        }
+        getUserLocation();
+        setInterval(getUserLocation, 60000);
+    </script>
+</body>
+</html>
